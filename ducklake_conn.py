@@ -5,25 +5,26 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def snapshot_conn():
-    user = os.getenv("snap_user")
-    pw = os.getenv("snap_password")
-    host = os.getenv("snap_host")
-    port = os.getenv("snap_port", "5432")
+    user   = os.getenv("snap_user")
+    pw     = os.getenv("snap_password")
+    host   = os.getenv("snap_host")
+    port   = os.getenv("snap_port", "5432")
     dbname = os.getenv("snap_dbname")
 
-    conn = duckdb.connect(database=":memory:", read_only=False)
+    conn = duckdb.connect(database=":memory:")
     conn.execute("install postgres;")
     conn.execute("load postgres;")
     conn.execute(
-        f"attach 'dbname={dbname} host={host} port={port} user={user} password={pw}' as snapshot(type postgres);"
+        f"attach 'dbname={dbname} host={host} port={port} user={user} password={pw}' "
+        "as snapshot(type postgres);"
     )
     return conn
 
 def local_ducklake_conn():
-    data_path = os.getenv("data_path", "./data")
+    data_path   = os.getenv("data_path", "./data")
     duckdb_path = os.getenv("duckdb_path", ":memory:")
 
-    conn = duckdb.connect(database=":memory:", read_only=False)
+    conn = duckdb.connect(database=":memory:")
     conn.execute("install ducklake;")
     conn.execute("load ducklake;")
     conn.execute(

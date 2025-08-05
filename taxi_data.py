@@ -1,84 +1,90 @@
-#!/usr/bin/env python3
 import os
-import duckdb
+import requests
+import time
 from dotenv import load_dotenv
-import ducklake_conn
+from ducklake_conn import local_ducklake_conn
+
+load_dotenv()
 
 def create_vendor_table(conn):
-    # Only create and fill the table if it does not exist
-    if table_exists(conn, 'vendor_names'):
+    exists = conn.execute(
+        "select count(*) from information_schema.tables where table_name='vendor_names';"
+    ).fetchone()[0]
+    if exists:
         return
-    conn.execute("""
-        CREATE TABLE vendor_names (
-            vendorid INTEGER,
-            vendor_name VARCHAR
-        )
-    """)
-    # TODO: Populate vendor_names from a lookup source
-
+    conn.execute(
+        "create table vendor_names (vendorid integer, vendor_name varchar);"
+    )
+    conn.execute(
+        "insert into vendor_names (vendorid, vendor_name) "
+        "values (1, 'Creative Mobile Technologies'), (2, 'VeriFone Inc.');"
+    )
 
 def create_rate_code_table(conn):
-    # Only create and fill the table if it does not exist
-    if table_exists(conn, 'rate_code_names'):
+    exists = conn.execute(
+        "select count(*) from information_schema.tables where table_name='rate_code_names';"
+    ).fetchone()[0]
+    if exists:
         return
-    conn.execute("""
-        CREATE TABLE rate_code_names (
-            ratecodeid INTEGER,
-            rate_code_description VARCHAR
-        )
-    """)
-    # TODO: Populate rate_code_names from a lookup source
+    conn.execute(
+        "create table rate_code_names (ratecodeid integer, rate_code_description varchar);"
+    )
+    conn.execute(
+        "insert into rate_code_names (ratecodeid, rate_code_description) values "
+        "(1, 'Standard rate'), (2, 'JFK'), (3, 'Newark'), (4, 'Nassau or Westchester'), "
+        "(5, 'Negotiated fare'), (6, 'Group ride');"
+    )
 
-
-def table_exists(conn, table_name):
-    result = conn.execute(f"SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '{table_name}'").fetchone()
-    return result[0] > 0
-
-
-def register_parquet_files(conn, data_dir: str):
-    """
-    Discover and register Parquet files in the given directory into DuckDB.
-    """
-    files = os.listdir(data_dir)
-    parquet_urls = [os.path.join(data_dir, f) for f in files if f.endswith('.parquet')]
-
-    first_file_found = False
-    for url in parquet_urls:
-        try:
-            if not first_file_found:
-                conn.execute(f"CREATE TABLE taxi_data AS SELECT * FROM read_parquet('{url}')")
-                first_file_found = True
-            else:
-                conn.execute(f"INSERT INTO taxi_data SELECT * FROM read_parquet('{url}')")
-        except Exception as e:
-            print(f"Error checking {url}: {e}")
-    if not first_file_found:
-        print("No valid files found. Exiting.")
+def create_zone_table(conn):
+    exists = conn.execute(
+        "select count(*) from information_schema.tables where table_name='taxi_zone_lookup';"
+    ).fetchone()[0]
+    if exists:
         return
+    conn.execute(
+        "create table taxi_zone_lookup (locationid integer, borough varchar, zone varchar, service_zone varchar);"
+    )
+    conn.execute(
+        "insert into taxi_zone_lookup "
+        "select * from read_csv_auto('taxi_zone_lookup.csv', header=true);"
+    )
 
+def register_parquet_files(conn):
+    first = False
+    for year in range(2022, 2025):
+        for month in range(1, 13):
+            if year == 2024 and month > 12:
+                break
+            url = (
+                f"https://d37ci6vzurychx.cloudfront.net/"
+                f"trip-data/yellow_tripdata_{year}-{month:02d}.parquet"
+            )
+            try:
+                r = requests.head(url, timeout=5)
+                if r.status_code != 200:
+                    continue
+                if not first:
+                    conn.execute(
+                        f"create table if not exists taxi_data as "
+                        f"select * from read_parquet('{url}') where 1=0;"
+                    )
+                    first = True
+                conn.execute(
+                    f"insert into taxi_data select * from read_parquet('{url}');"
+                )
+                time.sleep(5)
+            except Exception:
+                continue
+    if not first:
+        print("no valid files found. exiting.")
 
 def main():
-    load_dotenv()
-    # Establish connection via ducklake_conn helper
-    conn = ducklake_conn.local_ducklake_conn()
-
-    # Paths
-    DATA_DIR = os.getenv('DATA_PATH', './data')
-
-    # Create lookup tables
+    conn = local_ducklake_conn()
     create_vendor_table(conn)
     create_rate_code_table(conn)
-
-    # Register taxi parquet files into DuckDB
-    register_parquet_files(conn, DATA_DIR)
-
-    # Example analytics: count trips per vendor
-    result = conn.execute("SELECT vendorid, COUNT(*) AS trip_count FROM taxi_data GROUP BY vendorid").fetchdf()
-    print(result)
-
-    # Close the connection
+    create_zone_table(conn)
+    register_parquet_files(conn)
     conn.close()
-
 
 if __name__ == "__main__":
     main()
