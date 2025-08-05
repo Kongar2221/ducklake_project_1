@@ -1,0 +1,42 @@
+# virtual environments
+.venv/
+venv/
+env/
+
+# dotenv
+.env
+
+# ducklake on-disk catalog
+data_lake.db/
+*.duckdb
+*.db
+
+# parquet / data exports
+data/
+*.parquet
+*.csv
+
+# IDE/editor
+.vscode/
+.idea/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs and runtime files
+*.log
+*.pid
+*.seed
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git itself (not strictly necessary—Git folder is always excluded)
+.git/
