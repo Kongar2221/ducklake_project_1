@@ -51,9 +51,9 @@ def create_zone_table(conn):
 
 def register_parquet_files(conn):
     first = False
-    for year in range(2022, 2025):
+    for year in range(2015, 2025):
         for month in range(1, 13):
-            if year == 2024 and month > 12:
+            if year == 2025 and month > 8:
                 break
             url = (
                 f"https://d37ci6vzurychx.cloudfront.net/"
