@@ -1,0 +1,3 @@
+SHOW CREATE TABLE taxi_data;
+DESCRIBE taxi_data;
+SELECT * FROM taxi_data LIMIT 5;
